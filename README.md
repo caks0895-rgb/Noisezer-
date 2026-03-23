@@ -18,9 +18,7 @@ Noisezer solves this by providing autonomous, high-signal financial intelligence
 
 ### Prerequisites
 - Node.js (v18+)
-- API Keys:
-  - `BANKR_API_KEY` (for managed wallet features)
-  - `X_API_KEY` (for data filtering)
+- API Keys
 
 ### Setup
 1. Clone the repository.
@@ -42,6 +40,12 @@ Noisezer solves this by providing autonomous, high-signal financial intelligence
 - [Base Chain](https://www.base.org/) - High-performance blockchain infrastructure.
 - [Viem](https://viem.sh/) - TypeScript interface for Ethereum.
 - [Next.js](https://nextjs.org/) - React framework for the web.
+
+## Autonomous Financial Engine
+Noisezer is powered by Bankr, enabling:
+- Autonomous wallet management on Base Chain.
+- Self-sustaining operational costs via trading fees.
+- Secure, data-driven execution of financial insights.
 
 ## License
 This project is open-source and available under the MIT License.
