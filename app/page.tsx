@@ -97,7 +97,7 @@ export default function Home() {
     // Fetch initial signals
     fetch('/api/search', {
       method: 'POST',
-      body: JSON.stringify({ query: `Base chain alpha ${Date.now()}` })
+      body: JSON.stringify({ query: `Base chain latest active smart contract` })
     })
       .then(res => res.json())
       .then(data => setSignals(data))
@@ -153,21 +153,24 @@ export default function Home() {
             <span className="text-[10px] font-mono text-indigo-500 uppercase tracking-[0.2em] font-bold">System Online</span>
             <div className={cn("w-1.5 h-1.5 rounded-full", connected ? "bg-indigo-500 animate-pulse" : "bg-rose-500")} />
           </div>
-          <h2 className="text-3xl font-mono font-medium tracking-tight uppercase">Noisezer Truth Filter</h2>
+          <h2 className="text-3xl font-mono font-medium tracking-tight uppercase">Noisezer Data Provider</h2>
+          <p className="text-zinc-500 font-mono text-xs mt-2 max-w-2xl">
+            Noisezer provides market data and anomaly detection. We do NOT provide investment advice, buy/sell recommendations, price predictions, or trading signals. Users must make own decisions based on provided data. Noisezer is not liable for trading losses.
+          </p>
         </div>
 
         <Tabs>
           <Tab label="Dashboard">
             <DashboardTab agents={agents} insights={insights} stats={stats} />
           </Tab>
-          <Tab label="Noisezer">
-            <SignalTab signals={signals} isAnyAgentThinking={isAnyAgentThinking} socket={socket} />
+          <Tab label="Data Feed">
+            <SignalTab signals={signals} isAnyAgentThinking={isAnyAgentThinking} />
           </Tab>
-          <Tab label="Market">
+          <Tab label="API Usage">
             <MarketTab transactions={transactions} />
           </Tab>
           <Tab label="Settings">
-            <div className="text-center py-20 text-zinc-500 font-mono text-xs">Wallet and Agent configuration settings.</div>
+            <div className="text-center py-20 text-zinc-500 font-mono text-xs">API Key and Integration settings.</div>
           </Tab>
         </Tabs>
       </div>

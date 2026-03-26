@@ -13,12 +13,15 @@ Noisezer solves this by providing autonomous, high-signal financial intelligence
 - **Cross-Reference Engine:** Validates social sentiment against on-chain data (liquidity, whale activity).
 - **AI-to-AI Ready:** Provides pre-processed, high-signal alpha for other AI agents.
 - **Base Chain Native:** Built specifically for the Base Chain ecosystem.
+- **Persistent Memory:** Uses Firebase Firestore to store agent state and transaction history, ensuring continuity across restarts.
 
 ## Getting Started
 
 ### Prerequisites
 - Node.js (v18+)
-- API Keys
+- API Keys:
+  - `BANKR_API_KEY` (for managed wallet features)
+  - `X_API_KEY` (for data filtering)
 
 ### Setup
 1. Clone the repository.
@@ -40,12 +43,6 @@ Noisezer solves this by providing autonomous, high-signal financial intelligence
 - [Base Chain](https://www.base.org/) - High-performance blockchain infrastructure.
 - [Viem](https://viem.sh/) - TypeScript interface for Ethereum.
 - [Next.js](https://nextjs.org/) - React framework for the web.
-
-## Autonomous Financial Engine
-Noisezer is powered by Bankr, enabling:
-- Autonomous wallet management on Base Chain.
-- Self-sustaining operational costs via trading fees.
-- Secure, data-driven execution of financial insights.
 
 ## License
 This project is open-source and available under the MIT License.

@@ -1,5 +1,6 @@
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
+import { Providers } from './providers';
 import './globals.css';
 
 const inter = Inter({
@@ -16,8 +17,10 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="bg-[#0A0A0B] text-white antialiased font-sans">
-        {children}
-        <Toaster theme="dark" position="bottom-right" />
+        <Providers>
+          {children}
+          <Toaster theme="dark" position="bottom-right" />
+        </Providers>
       </body>
     </html>
   );

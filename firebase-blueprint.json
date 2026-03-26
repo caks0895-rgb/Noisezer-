@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "Agent": {
+      "title": "Agent",
+      "description": "Noisezer agent state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "task": { "type": "string" },
+        "status": { "type": "string" },
+        "x402Balance": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Noisezer transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "amount", "status", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/agents/{agentId}": {
+      "schema": { "$ref": "Agent" },
+      "description": "Noisezer agent states"
+    },
+    "/transactions/{txId}": {
+      "schema": { "$ref": "Transaction" },
+      "description": "Noisezer transaction records"
+    }
+  }
+}

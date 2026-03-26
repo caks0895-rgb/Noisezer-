@@ -13,9 +13,6 @@ const CACHE_TTL = 30000; // 30 seconds
 export const BANKR_API_KEY = process.env.BANKR_API_KEY || process.env.BANKR_KEY || process.env.NOISEZER_BANKR_API_KEY;
 const NOISEZER_PRIVATE_KEY = (process.env.NOISEZER_PRIVATE_KEY as `0x${string}`) || process.env.PRIVATE_KEY || generatePrivateKey();
 
-import * as fs from 'fs';
-fs.appendFileSync('bankr-debug.log', `[${new Date().toISOString()}] BLOCKCHAIN_INIT: NOISEZER_PRIVATE_KEY length: ${NOISEZER_PRIVATE_KEY?.length}\n`);
-
 export const publicClient = createPublicClient({
   chain: base,
   transport: http(RPC_URL),
@@ -27,8 +24,6 @@ export const publicClient = createPublicClient({
  */
 export function getNoisezerWallet(privateKey?: `0x${string}`) {
   if (!privateKey) {
-    // For demo purposes, we generate a new one if not provided
-    // In a real app, you'd load this from process.env.NOISEZER_PRIVATE_KEY
     return null;
   }
   
@@ -57,6 +52,38 @@ export async function getRecentBaseActivity() {
   } catch (error) {
     console.error('Error fetching on-chain activity:', error);
     return null;
+  }
+}
+
+/**
+ * Get basic token info (name, symbol, decimals, totalSupply) from contract
+ */
+export async function getTokenInfo(contractAddress: `0x${string}`) {
+  const abi = [
+    { name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
+    { name: 'symbol', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
+    { name: 'decimals', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
+    { name: 'totalSupply', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  ] as const;
+
+  try {
+    const [name, symbol, decimals, totalSupply] = await Promise.all([
+      publicClient.readContract({ address: contractAddress, abi, functionName: 'name' }),
+      publicClient.readContract({ address: contractAddress, abi, functionName: 'symbol' }),
+      publicClient.readContract({ address: contractAddress, abi, functionName: 'decimals' }),
+      publicClient.readContract({ address: contractAddress, abi, functionName: 'totalSupply' }),
+    ]);
+
+    return {
+      name,
+      symbol,
+      decimals,
+      totalSupply: totalSupply.toString(),
+      success: true
+    };
+  } catch (error) {
+    console.error(`Error fetching token info for ${contractAddress}:`, error);
+    return { success: false, error: 'Failed to fetch token info' };
   }
 }
 
@@ -95,70 +122,29 @@ export async function requestBankr(
     'Accept': 'application/json'
   };
 
-  const fs = await import('fs');
-  const log = (msg: string) => fs.appendFileSync('bankr-debug.log', `[${new Date().toISOString()}] ${msg}\n`);
-
-  log(`requestBankr ${url} (Retry: ${retryCount})`);
+  console.log(`requestBankr ${url} (Retry: ${retryCount})`);
   
-  // Log key info (sanitized)
-  if (retryCount === 0) {
-    log(`Using API Key: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)} (Length: ${apiKey.length})`);
-  }
-
   const response = await fetch(url, { ...options, headers });
-  log(`requestBankr ${url} returned status ${response.status}`);
+  console.log(`requestBankr ${url} returned status ${response.status}`);
   
-  if (!response.ok && response.status !== 402) {
-    const responseClone = response.clone();
-    const errorText = await responseClone.text();
-    log(`Response Body for ${url}: ${errorText.substring(0, 200)}`);
-  }
-
   // Handle X402 Payment Required
   if (response.status === 402 && retryCount < 1) {
-    log(`402 Payment Required for ${url}. Attempting X402 payment...`);
     console.log(`[BANKR] 402 Payment Required for ${url}. Attempting X402 payment...`);
     try {
-      const responseClone = response.clone();
-      const errorText = await responseClone.text();
-      log(`402 Response Body for ${url}: ${errorText}`);
-      console.log(`[BANKR] 402 Response Body for ${url}: ${errorText}`);
-      
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch (e) {
-        log(`[X402] Failed to parse 402 response as JSON`);
-        return response;
-      }
-
+      const errorData = await response.json();
       const paymentInfo = errorData.accepts?.[0];
       
-      if (!paymentInfo) {
-        log(`[X402] No payment info found in 402 response`);
-        return response;
-      }
-      log(`[X402] Payment info: ${JSON.stringify(paymentInfo)}`);
+      if (!paymentInfo) return response;
 
       const privateKey = NOISEZER_PRIVATE_KEY;
-      if (!privateKey) {
-        log(`[X402] No private key available for X402 payment fallback.`);
-        return response;
-      }
+      if (!privateKey) return response;
 
-      const { payTo, maxAmountRequired, asset, network } = paymentInfo;
-      // Fallback for older formats if any
+      const { payTo, maxAmountRequired, asset } = paymentInfo;
       const targetAddress = payTo || paymentInfo.address;
       const targetAmount = maxAmountRequired || paymentInfo.amount;
       
-      log(`[X402] Payment info: ${JSON.stringify(paymentInfo)}`);
-
       const account = privateKeyToAccount(privateKey as `0x${string}`);
       
-      // Check ETH balance for gas
-      const balance = await publicClient.getBalance({ address: account.address });
-      log(`[X402] Wallet ${account.address} balance: ${formatEther(balance)} ETH`);
-
       const walletClient = createWalletClient({
         account,
         chain: base,
@@ -168,9 +154,6 @@ export async function requestBankr(
       let hash: `0x${string}`;
 
       if (asset && asset !== '0x0000000000000000000000000000000000000000' && asset.toLowerCase() !== 'eth') {
-        log(`[X402] Asset is a token (${asset}). Attempting token transfer...`);
-        
-        // ERC20 Transfer ABI (minimal)
         const abi = [
           {
             name: 'transfer',
@@ -184,33 +167,23 @@ export async function requestBankr(
           }
         ] as const;
 
-        try {
-          const { request } = await publicClient.simulateContract({
-            account,
-            address: asset as `0x${string}`,
-            abi,
-            functionName: 'transfer',
-            args: [targetAddress as `0x${string}`, BigInt(targetAmount)]
-          });
-          hash = await walletClient.writeContract(request);
-        } catch (tokenErr) {
-          log(`[X402] Token transfer failed: ${tokenErr instanceof Error ? tokenErr.message : String(tokenErr)}`);
-          return response;
-        }
+        const { request } = await publicClient.simulateContract({
+          account,
+          address: asset as `0x${string}`,
+          abi,
+          functionName: 'transfer',
+          args: [targetAddress as `0x${string}`, BigInt(targetAmount)]
+        });
+        hash = await walletClient.writeContract(request);
       } else {
-        console.log(`[X402] Sending ${targetAmount} wei to ${targetAddress} from ${account.address}...`);
         hash = await walletClient.sendTransaction({
           to: targetAddress as `0x${string}`,
           value: BigInt(targetAmount),
         });
       }
 
-      console.log(`[X402] Payment sent: ${hash}. Waiting for confirmation...`);
-      log(`[X402] Payment sent: ${hash}`);
       await publicClient.waitForTransactionReceipt({ hash });
 
-      // Retry with X-PAYMENT header
-      console.log(`[X402] Retrying request with X-PAYMENT header...`);
       return await requestBankr(url, {
         ...options,
         headers: {
@@ -223,7 +196,6 @@ export async function requestBankr(
         }
       }, apiKey, retryCount + 1);
     } catch (e) {
-      log(`[X402] Payment flow failed: ${e instanceof Error ? e.message : String(e)}`);
       console.error('[X402] Payment flow failed:', e);
       return response;
     }
@@ -441,26 +413,35 @@ export async function bankrPrompt(apiKey: string, prompt: string) {
 export async function getBankrJobStatus(apiKey: string, jobId: string) {
   const endpoints = [
     `https://api.bankr.bot/agent/status/${jobId}`,
-    `https://api.bankr.bot/agent/jobs/${jobId}`
+    `https://api.bankr.bot/agent/jobs/${jobId}`,
+    `https://api.bankr.bot/agent/job/${jobId}`
   ];
 
+  let lastStatus = 0;
   for (const url of endpoints) {
     try {
       const response = await requestBankr(url, { method: 'GET' }, apiKey);
+      lastStatus = response.status;
+      
+      console.log(`[BANKR] getBankrJobStatus ${url} status: ${response.status}`);
 
       if (response.ok) {
         const data = await response.json();
+        console.log(`[BANKR] getBankrJobStatus ${url} data: ${JSON.stringify(data)}`);
         return {
           status: data.status || data.state || 'unknown',
           transactionHash: data.transactionHash || data.txHash || data.hash,
-          message: data.message || data.error || data.result || '',
+          message: data.response || data.message || data.error || data.result || '',
           address: data.address || data.walletAddress
         };
+      } else {
+        const errorText = await response.text();
+        console.log(`[BANKR] getBankrJobStatus ${url} error: ${errorText}`);
       }
     } catch (e) {
-      // Try next
+      console.log(`[BANKR] getBankrJobStatus ${url} exception: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
-  return { status: 'error', message: 'Could not fetch job status' };
+  return { status: 'error', message: `Could not fetch job status (Last Status: ${lastStatus})` };
 }

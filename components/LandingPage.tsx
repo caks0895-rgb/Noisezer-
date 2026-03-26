@@ -2,54 +2,77 @@
 
 import { motion } from 'motion/react';
 import { NoisezerLogo } from './Logo';
-import { ArrowRight, Zap, ShieldCheck, BarChart3 } from 'lucide-react';
+import { ArrowRight, Zap, ShieldCheck, BarChart3, Database, Github, Newspaper, BrainCircuit } from 'lucide-react';
 
 export function LandingPage({ onEnter }: { onEnter: () => void }) {
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-[#050505] text-white p-6 md:p-12">
       {/* Hero Section */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-16"
+        className="max-w-4xl mx-auto text-center mb-20"
       >
-        <div className="flex justify-center mb-6">
-          <NoisezerLogo className="w-20 h-20" />
+        <div className="flex justify-center mb-8">
+          <NoisezerLogo className="w-24 h-24" />
         </div>
-        <h1 className="text-6xl font-mono font-bold tracking-tighter mb-4">NOISEZER</h1>
-        <p className="text-zinc-500 font-mono text-lg max-w-md mx-auto">
-          Filter the noise. Capture the Alpha. Autonomous financial intelligence for the Base Chain.
+        <h1 className="text-5xl md:text-7xl font-mono font-bold tracking-tighter mb-6">NOISEZER</h1>
+        <p className="text-zinc-400 font-mono text-xl max-w-2xl mx-auto mb-10">
+          Autonomous Data Provider for Prediction Markets. 
+          We filter the noise. You capture the Alpha.
         </p>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onEnter}
+          className="flex items-center gap-2 bg-indigo-500 text-white px-8 py-4 rounded-full font-mono font-bold hover:bg-indigo-400 transition-colors mx-auto"
+        >
+          ENTER TERMINAL <ArrowRight size={18} />
+        </motion.button>
       </motion.div>
 
-      {/* Infographic Bento Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl w-full mb-16">
-        {[
-          { icon: Zap, title: "Alpha Filtering", desc: "Real-time AI analysis of X and RSS feeds." },
-          { icon: ShieldCheck, title: "Smart Money", desc: "Track new contracts with locked liquidity." },
-          { icon: BarChart3, title: "Prediction Markets", desc: "Polymarket data analysis for high-volume opportunities." }
-        ].map((item, i) => (
-          <motion.div 
-            key={i}
-            whileHover={{ y: -5 }}
-            className="bg-[#151619] border border-white/5 p-6 rounded-2xl shadow-2xl"
-          >
-            <item.icon className="text-indigo-500 mb-4" size={24} />
-            <h3 className="font-mono font-bold mb-2">{item.title}</h3>
-            <p className="text-zinc-500 font-mono text-sm">{item.desc}</p>
-          </motion.div>
-        ))}
+      {/* Guide/Intro Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-6xl mx-auto mb-20">
+        <div className="space-y-6">
+          <h2 className="text-2xl font-mono font-bold text-indigo-500">WHAT IS NOISEZER?</h2>
+          <p className="text-zinc-400 font-mono text-sm leading-relaxed">
+            Noisezer is a Data-as-a-Service (DaaS) platform designed for autonomous trading agents. 
+            We do not predict prices. We do not provide trading signals. 
+            We provide high-fidelity, machine-readable data fusion to empower your own trading logic.
+          </p>
+        </div>
+        <div className="space-y-6">
+          <h2 className="text-2xl font-mono font-bold text-indigo-500">THE CONSENSUS ENGINE</h2>
+          <p className="text-zinc-400 font-mono text-sm leading-relaxed">
+            Our engine fuses five distinct data sources into a single, normalized 0.0-1.0 Consensus Score.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { icon: Database, label: "On-Chain (50%)" },
+              { icon: Newspaper, label: "News (20%)" },
+              { icon: BarChart3, label: "Polymarket (15%)" },
+              { icon: BrainCircuit, label: "Social (10%)" },
+              { icon: Github, label: "GitHub (5%)" }
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-2 bg-[#151619] p-3 rounded-lg border border-white/5">
+                <item.icon size={16} className="text-indigo-500" />
+                <span className="font-mono text-xs">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* CTA */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={onEnter}
-        className="flex items-center gap-2 bg-indigo-500 text-white px-8 py-4 rounded-full font-mono font-bold hover:bg-indigo-400 transition-colors"
-      >
-        ENTER TERMINAL <ArrowRight size={18} />
-      </motion.button>
+      {/* Legal Disclaimer */}
+      <div className="max-w-4xl mx-auto bg-[#151619] border border-rose-900/30 p-8 rounded-2xl text-center">
+        <ShieldCheck className="text-rose-500 mx-auto mb-4" size={32} />
+        <h3 className="font-mono font-bold text-rose-500 mb-2">LEGAL DISCLAIMER</h3>
+        <p className="text-zinc-400 font-mono text-xs">
+          Noisezer provides market data and anomaly detection. We do NOT provide investment advice, 
+          buy/sell recommendations, price predictions, or trading signals. Users must make own decisions 
+          based on provided data. Noisezer is not liable for trading losses.
+        </p>
+      </div>
     </div>
   );
 }

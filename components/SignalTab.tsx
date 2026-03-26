@@ -2,17 +2,11 @@ import { SignalFeed } from './SignalFeed';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
-export function SignalTab({ signals, isAnyAgentThinking, socket }: { signals: any[], isAnyAgentThinking: boolean, socket: any }) {
+export function SignalTab({ signals, isAnyAgentThinking }: { signals: any[], isAnyAgentThinking: boolean }) {
   const [query, setQuery] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('ALL');
   const [minConfidence, setMinConfidence] = useState<number>(0);
   const [source, setSource] = useState<string>('ALL');
-
-  const handleRequestSignal = () => {
-    if (!socket || !query.trim()) return;
-    socket.emit('request-signal', { query, filters: [filterType] });
-    setQuery('');
-  };
 
   const filteredSignals = signals.filter(s => {
     const typeMatch = filterType === 'ALL' || s.type === filterType;
@@ -86,10 +80,10 @@ export function SignalTab({ signals, isAnyAgentThinking, socket }: { signals: an
             </div>
           </div>
           <button
-            onClick={handleRequestSignal}
-            className="w-full bg-indigo-500 text-white text-[10px] font-mono uppercase py-2 rounded hover:bg-indigo-600 transition-colors"
+            className="w-full bg-indigo-500/50 text-white text-[10px] font-mono uppercase py-2 rounded transition-colors cursor-not-allowed"
+            disabled
           >
-            Request Signal
+            Request Signal (Disabled)
           </button>
         </div>
       </div>
@@ -97,7 +91,7 @@ export function SignalTab({ signals, isAnyAgentThinking, socket }: { signals: an
         {filteredSignals.length === 0 ? (
           <div className="text-center py-20 text-zinc-500 font-mono text-xs">No signals matching filters.</div>
         ) : (
-          <SignalFeed signals={filteredSignals} isAnyAgentThinking={isAnyAgentThinking} socket={socket} />
+          <SignalFeed signals={filteredSignals} isAnyAgentThinking={isAnyAgentThinking} />
         )}
       </div>
     </div>

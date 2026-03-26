@@ -4,6 +4,27 @@ import { getRecentBaseActivity } from './blockchain';
 const discoveryCache = new Map<string, { data: any, timestamp: number }>();
 const CACHE_TTL = 1800000; // 30 minutes
 
+/**
+ * Verifikasi apakah narasi berita didukung oleh aktivitas on-chain (volume).
+ */
+function verifyOnChainActivity(rawData: any) {
+  // Logic: Check if any token mentioned in news has high volume in DexScreener (> $10k)
+  const highVolumeTokens = rawData.dex
+    .filter((pair: any) => pair.volume24h > 10000)
+    .map((pair: any) => pair.baseToken.address);
+
+  // Check if any news mentions these tokens (simplified)
+  const matches = rawData.news.some((news: any) => 
+    highVolumeTokens.some((addr: string) => news.title.includes(addr) || news.summary.includes(addr))
+  );
+
+  return {
+    narrative_matches_onchain: matches,
+    risk_level: matches ? 'LOW' : 'MEDIUM', // Narrative matches = lower risk
+    confidence: matches ? 0.9 : 0.4
+  };
+}
+
 export async function getBaseAlphaInsights() {
   const cacheKey = 'base_alpha_insights';
   const cached = discoveryCache.get(cacheKey);
@@ -28,7 +49,6 @@ export async function getBaseAlphaInsights() {
     const onChainData = await getRecentBaseActivity();
 
     // 5. Polymarket Order Book (Placeholder for BTC prediction market)
-    // Note: In a real scenario, we'd need to resolve the market ID from the URL.
     const polymarketData = await getPolymarketOrderBook('21033'); // Placeholder ID
 
     // Combine and Analyze (This will be passed to Gemini)
@@ -40,9 +60,13 @@ export async function getBaseAlphaInsights() {
       polymarket: polymarketData
     };
 
+    // Perform Verification
+    const verification = verifyOnChainActivity(rawData);
+
     // Note: Analysis happens in gemini.ts
     const result = {
       rawData,
+      verification,
       timestamp: Date.now()
     };
 
@@ -50,7 +74,7 @@ export async function getBaseAlphaInsights() {
     return result;
   } catch (error) {
     console.error('Discovery failed:', error);
-    return { rawData: null, timestamp: Date.now() };
+    return { rawData: null, verification: { narrative_matches_onchain: false, risk_level: 'HIGH', confidence: 0 }, timestamp: Date.now() };
   }
 }
 
