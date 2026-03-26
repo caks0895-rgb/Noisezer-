@@ -20,10 +20,11 @@ import Parser from 'rss-parser';
 import TelegramBot from 'node-telegram-bot-api';
 import { privateKeyToAccount } from 'viem/accounts';
 import { getBaseBalance, bankrSwap, getBankrJobStatus, getBankrBalances, bankrPrompt } from './lib/blockchain';
+import { getAgentMemory, saveAgentMemory } from './lib/memory';
 import { getBaseAlphaInsights } from './lib/discovery';
 import { OracleArbStrategy } from './lib/limitless/strategy';
 import { getLimitlessClient } from './lib/limitless/client';
-import { searchSignalServerCoT, analyzeIntent, getGeneralMarketSentiment } from './lib/gemini-server';
+import { searchSignalServerCoT, analyzeIntent, getGeneralMarketSentiment, IMMUTABLE_SYSTEM_PROMPT, requestLLM } from './lib/gemini-server';
 import { fetchDexScreenerData } from './lib/adapters/dexscreener';
 import { db } from './lib/firebase';
 import { doc, setDoc, getDoc, collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
@@ -42,58 +43,76 @@ const intervalManager = {
 
 import { logger } from './lib/logger';
 
-// Initialize Telegram Bot
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-let bot: TelegramBot | null = null;
-if (TELEGRAM_BOT_TOKEN) {
-  bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
-  bot.on('message', async (msg) => {
-    const chatId = msg.chat.id;
-    const text = msg.text;
-    if (!text) return;
-    
-    try {
-      if (!BANKR_API_KEY) {
-        bot?.sendMessage(chatId, 'Error: BANKR_API_KEY is not configured.');
-        return;
-      }
-      // Use bankrPrompt to get a response from the agent
-      const response = await bankrPrompt(BANKR_API_KEY, text);
-      console.log(`[TELEGRAM] bankrPrompt response: ${JSON.stringify(response)}`);
-      
-      if (response.success && response.data) {
-        const data = response.data;
-        const jobId = data.jobId || data.id || data.job_id;
-        if (jobId) {
-          bot?.sendMessage(chatId, 'Noisezer sedang memproses... (Job ID: ' + jobId + ')');
-          // Poll for status
-          let status = 'pending';
-          let result = null;
-          let attempts = 0;
-          console.log(`[TELEGRAM] Starting polling for jobId: ${jobId}`);
-          while (status === 'pending' && attempts < 10) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            console.log(`[TELEGRAM] Polling attempt ${attempts + 1} for jobId: ${jobId}`);
-            const jobStatus = await getBankrJobStatus(BANKR_API_KEY, jobId);
-            console.log(`[TELEGRAM] Job status response: ${JSON.stringify(jobStatus)}`);
-            status = jobStatus.status;
-            result = jobStatus.message;
-            attempts++;
-          }
-          bot?.sendMessage(chatId, result || 'Selesai diproses.');
-        } else {
-          const responseString = typeof data === 'string' ? data : JSON.stringify(data);
-          bot?.sendMessage(chatId, responseString);
-        }
-      } else {
-        bot?.sendMessage(chatId, 'Error: ' + (response.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('[TELEGRAM] Error processing request:', error);
-      bot?.sendMessage(chatId, 'Error processing your request. Please check server logs.');
-    }
-  });
-}
+// // Initialize Telegram Bot
+// const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+// let bot: TelegramBot | null = null;
+// if (TELEGRAM_BOT_TOKEN) {
+//   console.log('[TELEGRAM] Initializing bot...');
+//   // Disable polling to prevent 409 Conflict errors. 
+//   // We will use a webhook or ensure only one instance runs.
+//   bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
+//   console.log('[TELEGRAM] Bot initialized successfully (polling disabled).');
+//   bot.on('message', async (msg) => {
+//     console.log(`[TELEGRAM] Message received: ${msg.text}`);
+//     const chatId = msg.chat.id.toString();
+//     const text = msg.text;
+//     if (!text) return;
+//     
+//     try {
+//       if (!BANKR_API_KEY) {
+//         console.error('[TELEGRAM] BANKR_API_KEY is not configured.');
+//         bot?.sendMessage(chatId, 'Error: BANKR_API_KEY is not configured.');
+//         return;
+//       }
+//
+//       // 1. Get Memory
+//       console.log(`[TELEGRAM] Fetching memory for chatId: ${chatId}`);
+//       let memory;
+//       try {
+//         memory = await getAgentMemory(chatId);
+//       } catch (error) {
+//         console.error('[TELEGRAM] Error fetching memory:', error);
+//         // Define FirestoreErrorInfo interface locally or import if available
+//         // For now, just log and continue with empty memory
+//         memory = { chatId, history: [], lastUpdated: Date.now() };
+//       }
+//       
+//       // 2. Construct Prompt with Memory
+//       const historyContext = memory.history.map(h => `${h.role}: ${h.content}`).join('\n');
+//       const prompt = `
+//         ${IMMUTABLE_SYSTEM_PROMPT}
+//
+//         Conversation History:
+//         ${historyContext}
+//
+//         User: ${text}
+//       `;
+//
+//       // 3. Call Noisezer (using requestLLM directly)
+//       console.log(`[TELEGRAM] Calling requestLLM...`);
+//       const responseText = await requestLLM(prompt);
+//       console.log(`[TELEGRAM] requestLLM response: ${responseText}`);
+//       
+//       // 4. Save to Memory
+//       console.log(`[TELEGRAM] Saving to memory...`);
+//       try {
+//         await saveAgentMemory(chatId, 'user', text);
+//         await saveAgentMemory(chatId, 'assistant', responseText);
+//       } catch (error) {
+//         console.error('[TELEGRAM] Error saving memory:', error);
+//       }
+//       
+//       bot?.sendMessage(chatId, responseText);
+//     } catch (error) {
+//       console.error('[TELEGRAM] Error processing request:', error);
+//       const errorMessage = error instanceof Error ? error.message : String(error);
+//       const errorStack = error instanceof Error ? error.stack : '';
+//       bot?.sendMessage(chatId, `Error processing your request: ${errorMessage}\n\nStack: ${errorStack}`);
+//     }
+//   });
+// } else {
+//   console.warn('[TELEGRAM] TELEGRAM_BOT_TOKEN not configured.');
+// }
 
 // Persistent Noisezer Wallet from Environment or Temporary for Session
 const NOISEZER_PRIVATE_KEY = (process.env.NOISEZER_PRIVATE_KEY as `0x${string}`) || '';

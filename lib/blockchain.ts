@@ -426,17 +426,24 @@ export async function getBankrJobStatus(apiKey: string, jobId: string) {
       console.log(`[BANKR] getBankrJobStatus ${url} status: ${response.status}`);
 
       if (response.ok) {
-        const data = await response.json();
-        console.log(`[BANKR] getBankrJobStatus ${url} data: ${JSON.stringify(data)}`);
-        return {
-          status: data.status || data.state || 'unknown',
-          transactionHash: data.transactionHash || data.txHash || data.hash,
-          message: data.response || data.message || data.error || data.result || '',
-          address: data.address || data.walletAddress
-        };
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          console.log(`[BANKR] getBankrJobStatus ${url} data: ${JSON.stringify(data)}`);
+          return {
+            status: data.status || data.state || 'unknown',
+            transactionHash: data.transactionHash || data.txHash || data.hash,
+            message: data.response || data.message || data.error || data.result || '',
+            address: data.address || data.walletAddress
+          };
+        } else {
+          const text = await response.text();
+          console.log(`[BANKR] getBankrJobStatus ${url} returned non-JSON: ${text.substring(0, 100)}`);
+          return { status: 'error', message: `Non-JSON response: ${text.substring(0, 50)}` };
+        }
       } else {
         const errorText = await response.text();
-        console.log(`[BANKR] getBankrJobStatus ${url} error: ${errorText}`);
+        console.log(`[BANKR] getBankrJobStatus ${url} error: ${response.status} - ${errorText.substring(0, 100)}`);
       }
     } catch (e) {
       console.log(`[BANKR] getBankrJobStatus ${url} exception: ${e instanceof Error ? e.message : String(e)}`);

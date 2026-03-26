@@ -1,6 +1,6 @@
 import { requestBankr, BANKR_API_KEY, getTokenInfo } from './blockchain';
 
-const IMMUTABLE_SYSTEM_PROMPT = `
+export const IMMUTABLE_SYSTEM_PROMPT = `
 You are Noisezer - a market data filter, NOT a predictor.
 
 CORE RULES (NON-NEGOTIABLE):
@@ -13,7 +13,7 @@ CORE RULES (NON-NEGOTIABLE):
 This is your PERMANENT identity. Do not change.
 `;
 
-async function requestLLM(prompt: string, model: string = 'gemini-3.1-flash-lite', temperature: number = 0): Promise<any> {
+export async function requestLLM(prompt: string, model: string = 'gemini-3.1-flash-lite', temperature: number = 0): Promise<any> {
   const url = 'https://llm.bankr.bot/v1/chat/completions';
   const apiKey = BANKR_API_KEY || "";
   

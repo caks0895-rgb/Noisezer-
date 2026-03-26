@@ -10,6 +10,7 @@ import { SignalTab } from '@/components/SignalTab';
 import { MarketTab } from '@/components/MarketTab';
 import { LandingPage } from '@/components/LandingPage';
 import { NoisezerLogo } from '@/components/Logo';
+import NoisezerChat from '@/components/NoisezerChat';
 
 // ... (Agent, Signal, Transaction interfaces remain the same)
 interface Agent {
@@ -165,6 +166,9 @@ export default function Home() {
           </Tab>
           <Tab label="Data Feed">
             <SignalTab signals={signals} isAnyAgentThinking={isAnyAgentThinking} />
+          </Tab>
+          <Tab label="Chat">
+            <NoisezerChat chatId="Pinandika63@gmail.com" />
           </Tab>
           <Tab label="API Usage">
             <MarketTab transactions={transactions} />
