@@ -9,7 +9,7 @@ import { DashboardTab } from '@/components/DashboardTab';
 import { SignalTab } from '@/components/SignalTab';
 import { MarketTab } from '@/components/MarketTab';
 import { LandingPage } from '@/components/LandingPage';
-import { NoisezerLogo } from '@/components/Logo';
+import Logo from '@/components/Logo';
 import NoisezerChat from '@/components/NoisezerChat';
 
 // ... (Agent, Signal, Transaction interfaces remain the same)
@@ -98,10 +98,35 @@ export default function Home() {
     // Fetch initial signals
     fetch('/api/search', {
       method: 'POST',
-      body: JSON.stringify({ query: `Base chain latest active smart contract` })
+      headers: {
+        'X-Noisezer-API-Key': process.env.NEXT_PUBLIC_NOISEZER_API_KEY || 'dev-key-123'
+      },
+      body: JSON.stringify({ contract_address: `0x0000000000000000000000000000000000000000` })
     })
       .then(res => res.json())
-      .then(data => setSignals(data))
+      .then(data => {
+        if (Array.isArray(data)) {
+          const formattedSignals = data.map((item: any) => ({
+            id: item.id || `s-${Date.now()}-${Math.random()}`,
+            type: item.signal?.type || 'TRUTH_REPORT',
+            source: item.author || 'Noisezer AI',
+            content: item.content || '',
+            confidence: item.signal?.nti_score ? item.signal.nti_score / 100 : 0,
+            timestamp: Date.now(),
+            action: item.signal?.action || 'PROCESS',
+            noise_score: item.signal?.noise_score || 0,
+            manipulation_score: item.signal?.manipulation_score || 0,
+            divergence_score: item.signal?.divergence_score || 0,
+            anomaly_score: item.signal?.anomaly_score || 0,
+            primary_reason: item.signal?.rationale || item.content || 'No reason provided',
+            contract_address: item.signal?.contract_address || 'N/A'
+          }));
+          setSignals(formattedSignals);
+        } else {
+          console.error('Signals API returned non-array:', data);
+          setSignals([]);
+        }
+      })
       .catch(err => console.error('Failed to fetch signals:', err));
   }, []);
 
@@ -135,10 +160,14 @@ export default function Home() {
     <main className="min-h-screen flex flex-col bg-[#0A0A0B]">
       <nav className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-[#0A0A0B]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-2">
-          <NoisezerLogo className="w-8 h-8" />
+          <Logo className="w-8 h-8" />
           <h1 className="font-mono text-lg font-bold tracking-tighter uppercase">Noisezer</h1>
         </div>
         <div className="flex items-center gap-4">
+          <div className="hidden md:flex gap-2">
+            <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-[0.2em] font-bold bg-emerald-500/10 px-2 py-1 rounded">A2A Active</span>
+            <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-[0.2em] font-bold bg-emerald-500/10 px-2 py-1 rounded">Monetization Active</span>
+          </div>
           <button className="flex items-center gap-2 bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 rounded-full px-4 py-1.5 hover:bg-indigo-500/20 transition-all group">
             <Wallet size={16} />
             <span className="text-[10px] font-mono font-bold uppercase tracking-widest">Connect Wallet</span>
@@ -155,9 +184,9 @@ export default function Home() {
             <div className={cn("w-1.5 h-1.5 rounded-full", connected ? "bg-indigo-500 animate-pulse" : "bg-rose-500")} />
           </div>
           <h2 className="text-3xl font-mono font-medium tracking-tight uppercase">Noisezer Data Provider</h2>
-          <p className="text-zinc-500 font-mono text-xs mt-2 max-w-2xl">
-            Noisezer provides market data and anomaly detection. We do NOT provide investment advice, buy/sell recommendations, price predictions, or trading signals. Users must make own decisions based on provided data. Noisezer is not liable for trading losses.
-          </p>
+          <a href="/docs" className="text-zinc-500 font-mono text-xs mt-2 block hover:text-indigo-400 underline">
+            View API Documentation & Legal Terms
+          </a>
         </div>
 
         <Tabs>

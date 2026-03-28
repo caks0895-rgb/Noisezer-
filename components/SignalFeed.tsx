@@ -26,7 +26,7 @@ export function SignalFeed({ signals, isAnyAgentThinking }: { signals: Signal[],
   return (
     <div className="bg-[#151619] border border-white/5 rounded-xl flex flex-col h-full relative overflow-hidden">
       <div className="p-4 border-b border-white/5 flex items-center justify-between">
-        <h2 className="font-mono text-sm font-medium tracking-tight uppercase">Decision Gatekeeper</h2>
+        <h2 className="font-mono text-sm font-medium tracking-tight uppercase">Data Insights</h2>
         {isAnyAgentThinking && <span className="text-[8px] font-mono text-indigo-500 uppercase animate-pulse">Analyzing...</span>}
       </div>
 

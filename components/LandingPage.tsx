@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { NoisezerLogo } from './Logo';
+import Logo from './Logo';
 import { ArrowRight, Zap, ShieldCheck, BarChart3, Database, Github, Newspaper, BrainCircuit } from 'lucide-react';
 
 export function LandingPage({ onEnter }: { onEnter: () => void }) {
@@ -14,12 +14,12 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
         className="max-w-4xl mx-auto text-center mb-20"
       >
         <div className="flex justify-center mb-8">
-          <NoisezerLogo className="w-24 h-24" />
+          <Logo className="w-24 h-24" />
         </div>
         <h1 className="text-5xl md:text-7xl font-mono font-bold tracking-tighter mb-6">NOISEZER</h1>
         <p className="text-zinc-400 font-mono text-xl max-w-2xl mx-auto mb-10">
-          Autonomous Data Provider for Prediction Markets. 
-          We filter the noise. You capture the Alpha.
+          Autonomous Data Provider for Web3 Intelligence. 
+          We filter the noise. You build the intelligence.
         </p>
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -27,7 +27,7 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
           onClick={onEnter}
           className="flex items-center gap-2 bg-indigo-500 text-white px-8 py-4 rounded-full font-mono font-bold hover:bg-indigo-400 transition-colors mx-auto"
         >
-          ENTER TERMINAL <ArrowRight size={18} />
+          ENTER DATA TERMINAL <ArrowRight size={18} />
         </motion.button>
       </motion.div>
 
@@ -36,15 +36,15 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
         <div className="space-y-6">
           <h2 className="text-2xl font-mono font-bold text-indigo-500">WHAT IS NOISEZER?</h2>
           <p className="text-zinc-400 font-mono text-sm leading-relaxed">
-            Noisezer is a Data-as-a-Service (DaaS) platform designed for autonomous trading agents. 
-            We do not predict prices. We do not provide trading signals. 
-            We provide high-fidelity, machine-readable data fusion to empower your own trading logic.
+            Noisezer is a Data-as-a-Service (DaaS) platform designed for autonomous agents. 
+            We do not provide investment advice. 
+            We provide high-fidelity, machine-readable data fusion to empower your own logic.
           </p>
         </div>
         <div className="space-y-6">
           <h2 className="text-2xl font-mono font-bold text-indigo-500">THE CONSENSUS ENGINE</h2>
           <p className="text-zinc-400 font-mono text-sm leading-relaxed">
-            Our engine fuses five distinct data sources into a single, normalized 0.0-1.0 Consensus Score.
+            Our engine fuses five distinct data sources into a single, normalized 0.0-1.0 Intelligence Score.
           </p>
           <div className="grid grid-cols-2 gap-4">
             {[
@@ -69,8 +69,8 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
         <h3 className="font-mono font-bold text-rose-500 mb-2">LEGAL DISCLAIMER</h3>
         <p className="text-zinc-400 font-mono text-xs">
           Noisezer provides market data and anomaly detection. We do NOT provide investment advice, 
-          buy/sell recommendations, price predictions, or trading signals. Users must make own decisions 
-          based on provided data. Noisezer is not liable for trading losses.
+          buy/sell recommendations, or price predictions. Users must make their own decisions 
+          based on provided data. Noisezer is not liable for any outcomes.
         </p>
       </div>
     </div>

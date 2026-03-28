@@ -1,4 +1,5 @@
 import { getRecentBaseActivity } from './blockchain';
+import { requestLLM, MACHINE_SYSTEM_PROMPT } from './gemini-server';
 
 // Simple Cache for Discovery
 const discoveryCache = new Map<string, { data: any, timestamp: number }>();
@@ -90,4 +91,73 @@ export async function getPolymarketOrderBook(marketId: string) {
     console.error('Error fetching Polymarket order book:', error);
     return null;
   }
+}
+
+// --- GITHUB SCOUT ---
+
+async function searchGitHubRepos(query: string) {
+  const response = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=5`);
+  const data = await response.json();
+  return data.items || [];
+}
+
+async function fetchReadme(repoFullName: string) {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${repoFullName}/readme`, {
+      headers: { 'Accept': 'application/vnd.github.v3.raw' }
+    });
+    return await response.text();
+  } catch {
+    return "";
+  }
+}
+
+async function analyzeGitHubRepo(repo: any): Promise<{ score: number, reason: string }> {
+  const readme = await fetchReadme(repo.full_name);
+  const prompt = `
+    Analisis repo GitHub ini sebagai analis teknis untuk ekosistem Base Chain.
+    Repo: ${repo.full_name}
+    Description: ${repo.description}
+    README: ${readme.substring(0, 2000)}
+    
+    Berikan skor 0-100 berdasarkan:
+    - Kedalaman teknis (ada struktur aplikasi, dependensi relevan, test)
+    - Utilitas (memecahkan masalah di Base)
+    - Orisinalitas (bukan tutorial boilerplate)
+    
+    Output JSON: { "score": number, "reason": string }
+  `;
+  
+  try {
+    const analysis = await requestLLM(prompt, 'gemini-3.1-flash-lite', 0, MACHINE_SYSTEM_PROMPT);
+    const cleanedContent = analysis.replace(/```json\n?|\n?```/g, '').trim();
+    return JSON.parse(cleanedContent);
+  } catch {
+    return { score: 0, reason: 'Analysis failed' };
+  }
+}
+
+export async function discoverNewBaseBuilders() {
+  const repos = await searchGitHubRepos('topic:base created:>2026-03-20');
+  
+  const alphaBuilders = [];
+  for (const repo of repos) {
+    const analysis = await analyzeGitHubRepo(repo);
+    
+    if (analysis.score > 85) {
+      alphaBuilders.push({ 
+        id: `gh-${repo.id}`,
+        type: 'GITHUB_ALPHA',
+        source: 'GitHub Scout',
+        author: repo.owner.login,
+        content: `New Base Builder: ${repo.full_name}. ${analysis.reason}`,
+        confidence: analysis.score / 100,
+        timestamp: Date.now(),
+        url: repo.html_url,
+        x402Status: 'FREE',
+        isLive: true
+      });
+    }
+  }
+  return alphaBuilders;
 }

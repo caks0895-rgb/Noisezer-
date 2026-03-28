@@ -59,27 +59,42 @@ export async function getRecentBaseActivity() {
  * Get basic token info (name, symbol, decimals, totalSupply) from contract
  */
 export async function getTokenInfo(contractAddress: `0x${string}`) {
-  const abi = [
-    { name: 'name', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
-    { name: 'symbol', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
-    { name: 'decimals', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
-    { name: 'totalSupply', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
-  ] as const;
-
   try {
+    const fetchStringOrBytes32 = async (functionName: 'name' | 'symbol') => {
+      try {
+        return await publicClient.readContract({ address: contractAddress, abi: [{ name: functionName, type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] }] as const, functionName });
+      } catch {
+        try {
+          const bytes32 = await publicClient.readContract({ address: contractAddress, abi: [{ name: functionName, type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'bytes32' }] }] as const, functionName });
+          // Convert bytes32 to string
+          return bytes32.toString().replace(/\0/g, ''); // Simple conversion
+        } catch {
+          return 'N/A';
+        }
+      }
+    };
+
     const [name, symbol, decimals, totalSupply] = await Promise.all([
-      publicClient.readContract({ address: contractAddress, abi, functionName: 'name' }),
-      publicClient.readContract({ address: contractAddress, abi, functionName: 'symbol' }),
-      publicClient.readContract({ address: contractAddress, abi, functionName: 'decimals' }),
-      publicClient.readContract({ address: contractAddress, abi, functionName: 'totalSupply' }),
+      fetchStringOrBytes32('name'),
+      fetchStringOrBytes32('symbol'),
+      publicClient.readContract({ address: contractAddress, abi: [{ name: 'decimals', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] }] as const, functionName: 'decimals' }).catch(() => 18),
+      publicClient.readContract({ address: contractAddress, abi: [{ name: 'totalSupply', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }] as const, functionName: 'totalSupply' }).catch(() => BigInt(0)),
     ]);
 
+
+    // Only consider success if we got at least a name or symbol
+    const success = name !== 'N/A' || symbol !== 'N/A';
+
+    const formattedTotalSupply = typeof decimals === 'number' 
+      ? (Number(totalSupply) / Math.pow(10, decimals)).toString() 
+      : totalSupply.toString();
+
     return {
-      name,
-      symbol,
+      name: name === 'N/A' ? 'N/A' : name,
+      symbol: symbol === 'N/A' ? 'N/A' : symbol,
       decimals,
-      totalSupply: totalSupply.toString(),
-      success: true
+      totalSupply: formattedTotalSupply,
+      success
     };
   } catch (error) {
     console.error(`Error fetching token info for ${contractAddress}:`, error);
@@ -299,8 +314,6 @@ export async function getBankrBalances(apiKey: string) {
         if (response.ok) {
           const data = await response.json();
           console.log(`[BANKR] SUCCESS from ${endpoint.url}`);
-          const fs = await import('fs');
-          fs.appendFileSync('bankr-debug.log', `[${new Date().toISOString()}] SUCCESS from ${endpoint.url}: ${JSON.stringify(data)}\n`);
           
           const jobId = data.jobId || data.id || data.job_id;
           
@@ -348,13 +361,9 @@ export async function getBankrBalances(apiKey: string) {
         } else {
           const errorText = await response.text();
           console.warn(`[BANKR] Endpoint ${endpoint.url} failed with status ${response.status}: ${errorText.substring(0, 100)}`);
-          const fs = await import('fs');
-          fs.appendFileSync('bankr-debug.log', `[${new Date().toISOString()}] Balance ERROR from ${endpoint.url} (Status ${response.status}): ${errorText}\n`);
         }
       } catch (e) {
         console.warn(`[BANKR] Failed endpoint ${endpoint.url}:`, e instanceof Error ? e.message : String(e));
-        const fs = await import('fs');
-        fs.appendFileSync('bankr-debug.log', `[${new Date().toISOString()}] Endpoint EXCEPTION from ${endpoint.url}: ${e instanceof Error ? e.message : String(e)}\n`);
       }
     }
 

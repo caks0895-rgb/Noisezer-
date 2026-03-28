@@ -8,14 +8,14 @@ export function SignalTab({ signals, isAnyAgentThinking }: { signals: any[], isA
   const [minConfidence, setMinConfidence] = useState<number>(0);
   const [source, setSource] = useState<string>('ALL');
 
-  const filteredSignals = signals.filter(s => {
+  const filteredSignals = Array.isArray(signals) ? signals.filter(s => {
     const typeMatch = filterType === 'ALL' || s.type === filterType;
     const confidenceMatch = s.confidence >= minConfidence;
     const sourceMatch = source === 'ALL' || s.source === source;
     return typeMatch && confidenceMatch && sourceMatch;
-  });
+  }) : [];
 
-  const sources = Array.from(new Set(signals.map(s => s.source).filter(s => s)));
+  const sources = Array.isArray(signals) ? Array.from(new Set(signals.map(s => s.source).filter(s => s))) : [];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">

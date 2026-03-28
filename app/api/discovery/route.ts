@@ -5,10 +5,16 @@ import { analyzeNoiseServer } from '@/lib/gemini-server';
 export async function GET() {
   try {
     const rawData = await getBaseAlphaInsights();
+    
+    if (!rawData || !rawData.rawData) {
+      throw new Error('No rawData returned from getBaseAlphaInsights');
+    }
+
     const insights = await analyzeNoiseServer('base', rawData.rawData);
+    
     return NextResponse.json({ insights, timestamp: rawData.timestamp });
   } catch (error) {
-    console.error('Discovery API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch discovery data' }, { status: 500 });
+    console.error('Discovery API error details:', error);
+    return NextResponse.json({ error: 'Failed to fetch discovery data', details: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }

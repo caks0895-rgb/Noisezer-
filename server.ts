@@ -17,14 +17,13 @@ import next from 'next';
 import { Server } from 'socket.io';
 import express from 'express';
 import Parser from 'rss-parser';
-import TelegramBot from 'node-telegram-bot-api';
+// import TelegramBot from 'node-telegram-bot-api';
 import { privateKeyToAccount } from 'viem/accounts';
 import { getBaseBalance, bankrSwap, getBankrJobStatus, getBankrBalances, bankrPrompt } from './lib/blockchain';
 import { getAgentMemory, saveAgentMemory } from './lib/memory';
-import { getBaseAlphaInsights } from './lib/discovery';
-import { OracleArbStrategy } from './lib/limitless/strategy';
-import { getLimitlessClient } from './lib/limitless/client';
+import { getBaseAlphaInsights, discoverNewBaseBuilders } from './lib/discovery';
 import { searchSignalServerCoT, analyzeIntent, getGeneralMarketSentiment, IMMUTABLE_SYSTEM_PROMPT, requestLLM } from './lib/gemini-server';
+import { OnChainData, OffChainData } from './lib/scoring';
 import { fetchDexScreenerData } from './lib/adapters/dexscreener';
 import { db } from './lib/firebase';
 import { doc, setDoc, getDoc, collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
@@ -42,77 +41,6 @@ const intervalManager = {
 };
 
 import { logger } from './lib/logger';
-
-// // Initialize Telegram Bot
-// const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-// let bot: TelegramBot | null = null;
-// if (TELEGRAM_BOT_TOKEN) {
-//   console.log('[TELEGRAM] Initializing bot...');
-//   // Disable polling to prevent 409 Conflict errors. 
-//   // We will use a webhook or ensure only one instance runs.
-//   bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
-//   console.log('[TELEGRAM] Bot initialized successfully (polling disabled).');
-//   bot.on('message', async (msg) => {
-//     console.log(`[TELEGRAM] Message received: ${msg.text}`);
-//     const chatId = msg.chat.id.toString();
-//     const text = msg.text;
-//     if (!text) return;
-//     
-//     try {
-//       if (!BANKR_API_KEY) {
-//         console.error('[TELEGRAM] BANKR_API_KEY is not configured.');
-//         bot?.sendMessage(chatId, 'Error: BANKR_API_KEY is not configured.');
-//         return;
-//       }
-//
-//       // 1. Get Memory
-//       console.log(`[TELEGRAM] Fetching memory for chatId: ${chatId}`);
-//       let memory;
-//       try {
-//         memory = await getAgentMemory(chatId);
-//       } catch (error) {
-//         console.error('[TELEGRAM] Error fetching memory:', error);
-//         // Define FirestoreErrorInfo interface locally or import if available
-//         // For now, just log and continue with empty memory
-//         memory = { chatId, history: [], lastUpdated: Date.now() };
-//       }
-//       
-//       // 2. Construct Prompt with Memory
-//       const historyContext = memory.history.map(h => `${h.role}: ${h.content}`).join('\n');
-//       const prompt = `
-//         ${IMMUTABLE_SYSTEM_PROMPT}
-//
-//         Conversation History:
-//         ${historyContext}
-//
-//         User: ${text}
-//       `;
-//
-//       // 3. Call Noisezer (using requestLLM directly)
-//       console.log(`[TELEGRAM] Calling requestLLM...`);
-//       const responseText = await requestLLM(prompt);
-//       console.log(`[TELEGRAM] requestLLM response: ${responseText}`);
-//       
-//       // 4. Save to Memory
-//       console.log(`[TELEGRAM] Saving to memory...`);
-//       try {
-//         await saveAgentMemory(chatId, 'user', text);
-//         await saveAgentMemory(chatId, 'assistant', responseText);
-//       } catch (error) {
-//         console.error('[TELEGRAM] Error saving memory:', error);
-//       }
-//       
-//       bot?.sendMessage(chatId, responseText);
-//     } catch (error) {
-//       console.error('[TELEGRAM] Error processing request:', error);
-//       const errorMessage = error instanceof Error ? error.message : String(error);
-//       const errorStack = error instanceof Error ? error.stack : '';
-//       bot?.sendMessage(chatId, `Error processing your request: ${errorMessage}\n\nStack: ${errorStack}`);
-//     }
-//   });
-// } else {
-//   console.warn('[TELEGRAM] TELEGRAM_BOT_TOKEN not configured.');
-// }
 
 // Persistent Noisezer Wallet from Environment or Temporary for Session
 const NOISEZER_PRIVATE_KEY = (process.env.NOISEZER_PRIVATE_KEY as `0x${string}`) || '';
@@ -157,7 +85,6 @@ const port = 3000;
 let io: Server;
 let agents: any[] = [];
 const x402Transactions: any[] = [];
-const limitlessStrategy = new OracleArbStrategy();
 
 // Fetch real data from Polymarket (Gamma API - Public)
 async function fetchPolymarketData() {
@@ -232,7 +159,9 @@ async function pollSignals() {
     const offChainContext = `Alpha Insights: ${JSON.stringify(alphaInsights.rawData)}.`;
 
     const intent = await analyzeIntent('Base chain alpha opportunities');
-    const signals = intent.clarificationNeeded ? [] : await searchSignalServerCoT('Base chain alpha opportunities', offChainContext);
+    const mockOnChain: OnChainData = { liquidity: 50000, holders: 100, ageDays: 2, totalSupply: 1000000 };
+    const mockOffChain: OffChainData = { sentimentScore: 50, narrativeStrength: 50 };
+    const signals = intent.clarificationNeeded ? [] : await searchSignalServerCoT('Base chain alpha opportunities', mockOnChain, mockOffChain);
     if (signals && signals.length > 0) {
       // Auto-execute if PAID, high confidence, and balance > 5 USDC
       for (const signal of signals) {
@@ -322,62 +251,8 @@ async function autonomousOperations() {
 // Run autonomous operations every 30 minutes
 intervalManager.add(autonomousOperations, 30 * 60 * 1000);
 
-// Run Limitless autonomous operations every 5 minutes
-// setInterval(autonomousLimitlessOperations, 5 * 60 * 1000);
-
 // Initial run after a short delay
 setTimeout(autonomousOperations, 10000);
-// setTimeout(autonomousLimitlessOperations, 15000);
-
-async function autonomousLimitlessOperations() {
-  if (!process.env.LIMITLESS_API_KEY) return;
-
-  try {
-    console.log('[NOISEZER] Running Limitless autonomous operations...');
-    const client = getLimitlessClient();
-    const markets = await client.getMarkets();
-    
-    // Simulate Sub-Predict analysis
-    for (const market of markets.slice(0, 5)) {
-      const analysis = { score: Math.random() * 100 }; // Simulated score
-      
-      // Update feed
-      io.emit('signal-updates', [{
-        id: `s-limitless-${Date.now()}`,
-        type: 'PREDICTION',
-        source: 'Limitless',
-        author: 'Sub-Predict',
-        content: `Market: ${market.question}, Score: ${analysis.score.toFixed(2)}`,
-        confidence: analysis.score / 100,
-        timestamp: Date.now(),
-        x402Status: 'PAID'
-      }]);
-
-      if (analysis.score > 80) {
-        const result = await limitlessStrategy.tick(market, analysis);
-        
-        // Update feed with result
-        io.emit('x402-updates', [{
-          id: result.id,
-          amount: 1,
-          status: result.status,
-          timestamp: Date.now(),
-          type: 'LIMITLESS_BUY'
-        }]);
-        
-        // Feedback to Noisezer
-        const mainAgent = agents.find(a => a.id === 'noisezer-main');
-        if (mainAgent) {
-          mainAgent.task = `Limitless trade result: ${result.status}`;
-          mainAgent.history.push({ time: Date.now(), result: result.status, marketId: market.id });
-          io.emit('agent-updates', agents);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('[NOISEZER] Limitless Autonomous Ops Error:', error);
-  }
-}
 
 async function syncWithBankr() {
   if (BANKR_API_KEY) {
@@ -455,6 +330,26 @@ app.prepare().then(() => {
   const server = express();
   const httpServer = createServer(server);
   io = new Server(httpServer);
+
+  // GitHub Scout
+  intervalManager.add(async () => {
+    try {
+      console.log('[NOISEZER] Running GitHub Scout...');
+      const builders = await discoverNewBaseBuilders();
+      if (builders.length > 0) {
+        io.emit('signal-updates', builders);
+      }
+    } catch (error) {
+      console.error('[NOISEZER] GitHub Scout Error:', error);
+    }
+  }, 60 * 60 * 1000);
+
+  // Initial GitHub Scout
+  discoverNewBaseBuilders().then(builders => {
+    if (builders.length > 0) {
+      io.emit('signal-updates', builders);
+    }
+  });
 
   // Redefined Agents: Noisezer (Main) + Sub-agents
   agents = [
@@ -543,7 +438,7 @@ app.prepare().then(() => {
   // Initial Sync
   syncWithBankr();
 
-  // Update Mainnet Balance every 10 seconds
+  // Update Mainnet Balance every 1 hour
   intervalManager.add(async () => {
     const main = agents.find(a => a.id === 'noisezer-main');
     if (main && main.onchain) {
@@ -583,7 +478,7 @@ app.prepare().then(() => {
       }
       io.emit('agent-updates', agents);
     }
-  }, 10000);
+  }, 60 * 60 * 1000);
 
   io.on('connection', (socket) => {
     console.log('Client connected to monitoring');
@@ -684,7 +579,9 @@ app.prepare().then(() => {
         let results = [];
         
         if (intent.intent === 'TRADING') {
-          results = intent.clarificationNeeded ? [] : await searchSignalServerCoT(query, offChainContext);
+          const mockOnChain: OnChainData = { liquidity: 50000, holders: 100, ageDays: 2, totalSupply: 1000000 };
+          const mockOffChain: OffChainData = { sentimentScore: 50, narrativeStrength: 50 };
+          results = intent.clarificationNeeded ? [] : await searchSignalServerCoT(query, mockOnChain, mockOffChain);
         } else {
           results = await getGeneralMarketSentiment(query, offChainContext);
         }

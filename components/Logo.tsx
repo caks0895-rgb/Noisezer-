@@ -1,21 +1,18 @@
-import { cn } from '@/lib/utils';
-
-export function NoisezerLogo({ className }: { className?: string }) {
+export default function Logo({ className }: { className?: string }) {
   return (
-    <div className={cn("relative w-12 h-12 flex items-center justify-center", className)}>
-      {/* Outer ring (clock-like) */}
-      <div className="absolute inset-0 rounded-full border-2 border-indigo-500/30"></div>
-      <div className="absolute inset-1 rounded-full border border-indigo-500/10"></div>
+    <svg viewBox="0 0 200 200" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Crescent Moon (Dark Blue) */}
+      <path d="M100 20 C 50 20, 20 50, 20 100 C 20 150, 50 180, 100 180 C 140 180, 160 150, 160 100 C 160 50, 140 20, 100 20 Z" fill="#1e3a8a" />
       
-      {/* Abstract 'N' with time-like elements */}
-      <div className="relative w-6 h-6">
-        <div className="absolute top-0 left-0 w-full h-0.5 bg-indigo-500 origin-left rotate-45"></div>
-        <div className="absolute bottom-0 right-0 w-full h-0.5 bg-indigo-500 origin-right rotate-45"></div>
-        <div className="absolute top-0 right-0 w-0.5 h-full bg-indigo-500 origin-top -rotate-45"></div>
-      </div>
+      {/* Owl Body (Light Cream) */}
+      <path d="M100 50 C 70 50, 60 80, 60 120 C 60 150, 80 170, 100 170 C 120 170, 140 150, 140 120 C 140 80, 130 50, 100 50 Z" fill="#fef3c7" />
       
-      {/* 'Time' tick */}
-      <div className="absolute top-1 left-1/2 -translate-x-1/2 w-0.5 h-2 bg-indigo-500 rounded-full"></div>
-    </div>
+      {/* Eyes (Yellow) */}
+      <circle cx="85" cy="90" r="15" fill="#fbbf24" />
+      <circle cx="115" cy="90" r="15" fill="#fbbf24" />
+      
+      {/* N/Z Integration */}
+      <text x="50" y="190" fontFamily="sans-serif" fontSize="30" fontWeight="bold" fill="white">N/Z</text>
+    </svg>
   );
 }

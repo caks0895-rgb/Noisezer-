@@ -20,7 +20,7 @@ export function MarketTab({ transactions }: { transactions: Transaction[] }) {
       <div className="bg-[#151619] border border-white/5 rounded-xl p-6">
         <div className="flex items-center gap-2 mb-6">
           <Activity size={16} className="text-indigo-500" />
-          <h2 className="font-mono text-sm font-medium tracking-tight uppercase">Trade History</h2>
+          <h2 className="font-mono text-sm font-medium tracking-tight uppercase">Data Request History</h2>
         </div>
         
         {transactions.length === 0 ? (
