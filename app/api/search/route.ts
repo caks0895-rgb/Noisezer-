@@ -5,7 +5,7 @@ import { OnChainData, OffChainData } from '@/lib/scoring';
 import { ErrorResponse } from '@/lib/a2a-schema';
 
 // Simple API Key validation (In production, use Firebase/Database)
-const VALID_API_KEYS = new Set([process.env.NOISEZER_API_KEY || 'dev-key-123']);
+const VALID_API_KEYS = new Set([process.env.NOISEZER_API_KEY].filter(Boolean) as string[]);
 const DAILY_LIMIT = 10; // Updated to 10
 
 function sendError(code: string, message: string, status: number = 400): NextResponse<ErrorResponse> {

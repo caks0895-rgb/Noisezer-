@@ -99,7 +99,7 @@ export default function Home() {
     fetch('/api/search', {
       method: 'POST',
       headers: {
-        'X-Noisezer-API-Key': process.env.NEXT_PUBLIC_NOISEZER_API_KEY || 'dev-key-123'
+        'X-Noisezer-API-Key': process.env.NEXT_PUBLIC_NOISEZER_API_KEY || ''
       },
       body: JSON.stringify({ contract_address: `0x0000000000000000000000000000000000000000` })
     })
