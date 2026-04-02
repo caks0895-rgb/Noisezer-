@@ -1,17 +1,29 @@
 {
   "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
     "Agent": {
       "title": "Agent",
       "description": "Noisezer agent state",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "uid": { "type": "string" },
         "name": { "type": "string" },
         "task": { "type": "string" },
         "status": { "type": "string" },
         "x402Balance": { "type": "number" }
       },
-      "required": ["id", "name"]
+      "required": ["id", "uid", "name"]
     },
     "Transaction": {
       "title": "Transaction",
@@ -19,14 +31,31 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "uid": { "type": "string" },
         "amount": { "type": "number" },
         "status": { "type": "string" },
         "timestamp": { "type": "number" }
       },
-      "required": ["id", "amount", "status", "timestamp"]
+      "required": ["id", "uid", "amount", "status", "timestamp"]
+    },
+    "AgentMemory": {
+      "title": "AgentMemory",
+      "description": "Noisezer agent memory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "chatId": { "type": "string" },
+        "memory": { "type": "string" }
+      },
+      "required": ["id", "uid", "chatId", "memory"]
     }
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "User profiles"
+    },
     "/agents/{agentId}": {
       "schema": { "$ref": "Agent" },
       "description": "Noisezer agent states"
@@ -34,6 +63,10 @@
     "/transactions/{txId}": {
       "schema": { "$ref": "Transaction" },
       "description": "Noisezer transaction records"
+    },
+    "/agent_memory/{chatId}": {
+      "schema": { "$ref": "AgentMemory" },
+      "description": "Noisezer agent memory"
     }
   }
 }

@@ -1,5 +1,3 @@
-import { Type } from "@google/genai";
-
 export interface PostAnalysis {
   score: number; // 0-100
   summary: string;

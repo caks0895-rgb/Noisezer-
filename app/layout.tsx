@@ -2,6 +2,7 @@ import { Inter, JetBrains_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { Providers } from './providers';
 import './globals.css';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -17,10 +18,12 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="bg-[#0A0A0B] text-white antialiased font-sans">
-        <Providers>
-          {children}
-          <Toaster theme="dark" position="bottom-right" />
-        </Providers>
+        <ErrorBoundary>
+          <Providers>
+            {children}
+            <Toaster theme="dark" position="bottom-right" />
+          </Providers>
+        </ErrorBoundary>
       </body>
     </html>
   );

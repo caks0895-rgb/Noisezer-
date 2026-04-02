@@ -1,14 +1,79 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() { return request.auth != null; }
+    function isOwner(uid) { return isAuthenticated() && request.auth.uid == uid; }
+    function isDocOwner(doc) { return isAuthenticated() && doc != null && doc.uid == request.auth.uid; }
+    function isAdmin() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isAuthenticated() &&
+        ((userDoc.data != null && userDoc.data.role == 'admin') ||
+         request.auth.token.email == "Pinandika63@gmail.com");
+    }
+
+    // Validation helpers
+    function hasOnlyAllowedFields(fields) { return request.resource.data.keys().hasOnly(fields); }
+    function validString(field, min, max) {
+      return request.resource.data[field] is string && request.resource.data[field].size() >= min && request.resource.data[field].size() <= max;
+    }
+    function validNumber(field, min, max) {
+      return request.resource.data[field] is number && request.resource.data[field] >= min && request.resource.data[field] <= max;
+    }
+    function isValidAgentMemory(data) {
+      return data.keys().hasAll(['chatId', 'uid', 'history', 'lastUpdated']) &&
+             data.keys().hasOnly(['chatId', 'uid', 'history', 'lastUpdated']) &&
+             data.chatId is string && data.chatId.size() < 100 &&
+             data.uid is string && data.uid.size() < 100 &&
+             data.lastUpdated is number &&
+             data.history is list && data.history.size() < 1000;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && hasOnlyAllowedFields(['uid', 'email', 'role']) && validString('uid', 1, 100) && validString('email', 1, 100) && validString('role', 1, 20);
+      allow write: if isAdmin();
+    }
+
+
+    match /rate_limits/{identifier} {
+      allow read, write: if isOwner(identifier) || isAdmin();
+    }
     match /agents/{agentId} {
-      allow read, write: if true;
+      allow read: if isDocOwner(resource.data) || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow update: if isDocOwner(resource.data) || isAdmin();
+      allow delete: if isDocOwner(resource.data) || isAdmin();
     }
     match /transactions/{txId} {
-      allow read, write: if true;
+      allow read: if isDocOwner(resource.data) || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow update: if isDocOwner(resource.data) || isAdmin();
+      allow delete: if isDocOwner(resource.data) || isAdmin();
     }
     match /agent_memory/{chatId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated() && (
+        (resource.data != null && resource.data.uid == request.auth.uid) || 
+        chatId.lower() == request.auth.token.email.lower() || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && 
+        isValidAgentMemory(request.resource.data) &&
+        (request.resource.data.uid == request.auth.uid || 
+         chatId.lower() == request.auth.token.email.lower());
+      allow update: if isAuthenticated() && 
+        isValidAgentMemory(request.resource.data) &&
+        (
+          (resource.data != null && resource.data.uid == request.auth.uid) || 
+          chatId.lower() == request.auth.token.email.lower() || 
+          isAdmin()
+        ) &&
+        request.resource.data.uid == resource.data.uid;
+      allow delete: if isAuthenticated() && (
+        (resource.data != null && resource.data.uid == request.auth.uid) || 
+        chatId.lower() == request.auth.token.email.lower() || 
+        isAdmin()
+      );
     }
   }
 }

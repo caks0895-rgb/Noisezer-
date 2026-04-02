@@ -25,8 +25,7 @@ import { getBaseAlphaInsights, discoverNewBaseBuilders } from './lib/discovery';
 import { searchSignalServerCoT, analyzeIntent, getGeneralMarketSentiment, IMMUTABLE_SYSTEM_PROMPT, requestLLM } from './lib/gemini-server';
 import { OnChainData, OffChainData } from './lib/scoring';
 import { fetchDexScreenerData } from './lib/adapters/dexscreener';
-import { db } from './lib/firebase';
-import { doc, setDoc, getDoc, collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+// import { dbAdmin } from './lib/firebase-admin';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -54,7 +53,7 @@ let NOISEZER_ADDRESS = OFFICIAL_NOISEZER_ADDRESS;
 let isWalletReady = false;
 
 if (BANKR_API_KEY) {
-  logger.info(`BANKR_API_KEY detected (Length: ${BANKR_API_KEY.length}). Noisezer is now in Managed Wallet mode.`);
+  logger.info(`BANKR_API_KEY detected (Length: ${BANKR_API_KEY?.length || 0}). Noisezer is now in Managed Wallet mode.`);
 } else {
   logger.warn('BANKR_API_KEY not found. Noisezer is in Self-Managed (Temporary) mode.');
 }
@@ -191,7 +190,8 @@ async function pollSignals() {
 
 async function saveAgent(agent: any) {
   try {
-    await setDoc(doc(db, 'agents', agent.id), agent);
+    // await dbAdmin.collection('agents').doc(agent.id).set(agent);
+    console.log('[FIRESTORE] saveAgent (disabled):', agent.id);
   } catch (error) {
     console.error('[FIRESTORE] Error saving agent:', error);
   }
@@ -199,7 +199,8 @@ async function saveAgent(agent: any) {
 
 async function saveTransaction(tx: any) {
   try {
-    await setDoc(doc(db, 'transactions', tx.id), tx);
+    // await dbAdmin.collection('transactions').doc(tx.id).set(tx);
+    console.log('[FIRESTORE] saveTransaction (disabled):', tx.id);
   } catch (error) {
     console.error('[FIRESTORE] Error saving transaction:', error);
   }
@@ -254,7 +255,7 @@ intervalManager.add(autonomousOperations, 30 * 60 * 1000);
 // Initial run after a short delay
 setTimeout(autonomousOperations, 10000);
 
-async function syncWithBankr() {
+async function syncWithBankr(ioInstance: Server) {
   if (BANKR_API_KEY) {
     try {
       logger.info('[BANKR] Syncing wallet info...');
@@ -290,9 +291,9 @@ async function syncWithBankr() {
         } else {
           logger.warn('[BANKR] Could not find Noisezer Main Agent in agents array!');
         }
-        if (io) {
-          io.emit('bankr-sync-success', { address: NOISEZER_ADDRESS });
-          io.emit('agent-updates', agents);
+        if (ioInstance) {
+          ioInstance.emit('bankr-sync-success', { address: NOISEZER_ADDRESS });
+          ioInstance.emit('agent-updates', agents);
         }
       } else {
         throw new Error('No address returned from Bankr API');
@@ -310,8 +311,8 @@ async function syncWithBankr() {
         if (main && main.onchain) {
           main.onchain.address = NOISEZER_ADDRESS;
           main.onchain.bankrStatus = 'ERROR';
-          if (io) {
-            io.emit('agent-updates', agents);
+          if (ioInstance) {
+            ioInstance.emit('agent-updates', agents);
           }
         }
       } catch (fallbackError) {
@@ -436,7 +437,7 @@ app.prepare().then(() => {
   // --- REAL-TIME UPDATES (REAL DATA ONLY) ---
 
   // Initial Sync
-  syncWithBankr();
+  syncWithBankr(io);
 
   // Update Mainnet Balance every 1 hour
   intervalManager.add(async () => {
@@ -491,7 +492,7 @@ app.prepare().then(() => {
 
     socket.on('sync-bankr', async () => {
       console.log('[BANKR] Manual sync requested via socket');
-      await syncWithBankr();
+      await syncWithBankr(io);
       socket.emit('bankr-sync-complete', { success: true });
     });
 

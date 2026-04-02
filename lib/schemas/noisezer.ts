@@ -11,11 +11,11 @@ export const NTIResponseSchema = z.object({
   data: z.object({
     on_chain: z.object({
       score: z.number(),
-      breakdown: z.record(z.any())
+      breakdown: z.record(z.string(), z.any())
     }),
     off_chain: z.object({
       score: z.number(),
-      breakdown: z.record(z.any())
+      breakdown: z.record(z.string(), z.any())
     })
   }),
   disclaimer: z.string()

@@ -3,34 +3,50 @@ import { searchSignalServerCoT } from '@/lib/gemini-server';
 import { recordApiCost, recordRevenue } from '@/lib/economic-engine';
 import { OnChainData, OffChainData } from '@/lib/scoring';
 import { ErrorResponse } from '@/lib/a2a-schema';
+import { dbAdmin } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
-// Simple API Key validation (In production, use Firebase/Database)
-const VALID_API_KEYS = new Set([process.env.NOISEZER_API_KEY].filter(Boolean) as string[]);
-const DAILY_LIMIT = 10; // Updated to 10
+const DAILY_LIMIT = 5;
 
 function sendError(code: string, message: string, status: number = 400): NextResponse<ErrorResponse> {
   return NextResponse.json({ status: 'error', code, message }, { status });
 }
 
 export async function POST(req: Request) {
-  const apiKey = req.headers.get('X-Noisezer-API-Key');
-  if (!apiKey || !VALID_API_KEYS.has(apiKey)) {
-    return sendError('UNAUTHORIZED', 'Invalid or missing API Key', 401);
-  }
-
-  // TODO: Implement actual Firebase quota tracking here
-  // For now, enforcing the limit logic structure
-  const currentUsage = 0; // Placeholder: Fetch from Firebase
-  if (currentUsage >= DAILY_LIMIT) {
-    return sendError('PAYMENT_REQUIRED', 'Kuota harian (10) habis. Bayar via X402.', 402);
-  }
-
   const body = await req.json();
-  if (!body.contract_address) {
+  const { contract_address, agentId, isPaid } = body;
+
+  if (!contract_address) {
     return sendError('INVALID_REQUEST', 'Missing contract_address parameter');
   }
 
-  const { contract_address, isPaid } = body;
+  // 1. Check for API Key (Paid access)
+  const apiKey = req.headers.get('X-Noisezer-API-Key');
+  const isValidKey = apiKey && process.env.NOISEZER_API_KEY === apiKey;
+
+  if (!isValidKey) {
+    // 2. If no valid API Key, check for free quota (requires agentId)
+    if (!agentId) {
+      return sendError('UNAUTHORIZED', 'Invalid API Key or missing agentId for free quota', 401);
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const quotaRef = dbAdmin.collection('quotas').doc(agentId);
+    const quotaSnap = await quotaRef.get();
+
+    if (!quotaSnap.exists) {
+      await quotaRef.set({ count: 1, lastReset: today, uid: agentId });
+    } else {
+      const data = quotaSnap.data();
+      if (data?.lastReset !== today) {
+        await quotaRef.update({ count: 1, lastReset: today });
+      } else if ((data?.count || 0) >= DAILY_LIMIT) {
+        return sendError('PAYMENT_REQUIRED', 'Kuota harian (5) habis. Bayar via X402.', 402);
+      } else {
+        await quotaRef.update({ count: FieldValue.increment(1) });
+      }
+    }
+  }
 
   if (isPaid) {
     recordRevenue();

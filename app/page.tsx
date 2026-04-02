@@ -11,6 +11,7 @@ import { MarketTab } from '@/components/MarketTab';
 import { LandingPage } from '@/components/LandingPage';
 import Logo from '@/components/Logo';
 import NoisezerChat from '@/components/NoisezerChat';
+import GoogleLogin from '@/components/GoogleLogin';
 
 // ... (Agent, Signal, Transaction interfaces remain the same)
 interface Agent {
@@ -91,39 +92,43 @@ export default function Home() {
 
   useEffect(() => {
     fetch('/api/discovery')
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) throw new Error(`Discovery API failed with status ${res.status}`);
+        return res.json();
+      })
       .then(data => setInsights(data.insights))
       .catch(err => console.error('Failed to fetch insights:', err));
     
     // Fetch initial signals
-    fetch('/api/search', {
+    fetch('/api/nti', {
       method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         'X-Noisezer-API-Key': process.env.NEXT_PUBLIC_NOISEZER_API_KEY || ''
       },
-      body: JSON.stringify({ contract_address: `0x0000000000000000000000000000000000000000` })
+      body: JSON.stringify({ ca: `0x0000000000000000000000000000000000000000` })
     })
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) throw new Error(`NTI API failed with status ${res.status}`);
+        return res.json();
+      })
       .then(data => {
-        if (Array.isArray(data)) {
-          const formattedSignals = data.map((item: any) => ({
-            id: item.id || `s-${Date.now()}-${Math.random()}`,
-            type: item.signal?.type || 'TRUTH_REPORT',
-            source: item.author || 'Noisezer AI',
-            content: item.content || '',
-            confidence: item.signal?.nti_score ? item.signal.nti_score / 100 : 0,
+        // Assuming data structure matches NTIResponse
+        if (data && data.verdict) {
+          const formattedSignals = [{
+            id: `s-${Date.now()}`,
+            type: 'TRUTH_REPORT',
+            source: 'Noisezer AI',
+            content: data.narrative || 'Analysis complete.',
+            confidence: data.nti_score / 100,
             timestamp: Date.now(),
-            action: item.signal?.action || 'PROCESS',
-            noise_score: item.signal?.noise_score || 0,
-            manipulation_score: item.signal?.manipulation_score || 0,
-            divergence_score: item.signal?.divergence_score || 0,
-            anomaly_score: item.signal?.anomaly_score || 0,
-            primary_reason: item.signal?.rationale || item.content || 'No reason provided',
-            contract_address: item.signal?.contract_address || 'N/A'
-          }));
+            action: data.verdict,
+            primary_reason: data.narrative,
+            contract_address: '0x0000000000000000000000000000000000000000'
+          }];
           setSignals(formattedSignals);
         } else {
-          console.error('Signals API returned non-array:', data);
+          console.error('Signals API returned unexpected data:', data);
           setSignals([]);
         }
       })
@@ -168,10 +173,7 @@ export default function Home() {
             <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-[0.2em] font-bold bg-emerald-500/10 px-2 py-1 rounded">A2A Active</span>
             <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-[0.2em] font-bold bg-emerald-500/10 px-2 py-1 rounded">Monetization Active</span>
           </div>
-          <button className="flex items-center gap-2 bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 rounded-full px-4 py-1.5 hover:bg-indigo-500/20 transition-all group">
-            <Wallet size={16} />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-widest">Connect Wallet</span>
-          </button>
+          <GoogleLogin />
         </div>
       </nav>
       

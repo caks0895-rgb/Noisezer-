@@ -1,28 +1,33 @@
 import { NextResponse } from 'next/server';
-import { generateNonce, verifySignature, createSession } from '@/lib/siwe';
-import { cookies } from 'next/headers';
+import { SiweMessage } from 'siwe';
+import { admin } from '@/lib/firebase-admin';
 
-export async function GET() {
-  const nonce = await generateNonce();
-  return NextResponse.json({ nonce });
-}
-
-export async function POST(request: Request) {
-  const { message, signature, nonce } = await request.json();
-
-  const isValid = await verifySignature(message, signature, nonce);
-  if (!isValid) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+export async function POST(req: Request) {
+  try {
+    const { message, signature } = await req.json();
+    const siweMessage = new SiweMessage(message);
+    
+    // Verify signature
+    const fields = await siweMessage.verify({ signature });
+    
+    // Create or get Firebase user
+    const uid = `eth:${fields.data.address.toLowerCase()}`;
+    
+    try {
+      await admin.auth().getUser(uid);
+    } catch (error) {
+      await admin.auth().createUser({
+        uid,
+        displayName: fields.data.address,
+      });
+    }
+    
+    // Create custom token
+    const customToken = await admin.auth().createCustomToken(uid);
+    
+    return NextResponse.json({ customToken });
+  } catch (error) {
+    console.error('SIWE Auth Error:', error);
+    return NextResponse.json({ error: 'Authentication failed' }, { status: 401 });
   }
-
-  const sessionToken = await createSession(new URL(message).searchParams.get('address') || '');
-  
-  (await cookies()).set('session', sessionToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 60 * 60 * 24, // 24 hours
-  });
-
-  return NextResponse.json({ success: true });
 }

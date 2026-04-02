@@ -1,7 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
 import { NTIResult } from "../../../lib/nti-engine/types";
-
-const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || '' });
+import { requestLLM } from "../../../lib/gemini-server";
 
 export async function generateNarrative(result: NTIResult): Promise<string> {
   const prompt = `
@@ -14,10 +12,7 @@ export async function generateNarrative(result: NTIResult): Promise<string> {
     Provide a concise, professional narrative explaining this gap between reality and hype.
   `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-  });
+  const responseText = await requestLLM(prompt, "gemini-3-flash", 0);
 
-  return response.text || "No narrative generated.";
+  return responseText || "No narrative generated.";
 }

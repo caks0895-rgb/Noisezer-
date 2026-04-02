@@ -46,7 +46,7 @@ export async function getRecentBaseActivity() {
     const block = await publicClient.getBlock({ blockTag: 'latest' });
     return {
       blockNumber: block.number.toString(),
-      transactionCount: block.transactions.length,
+      transactionCount: block.transactions?.length || 0,
       timestamp: block.timestamp.toString(),
     };
   } catch (error) {
@@ -60,15 +60,20 @@ export async function getRecentBaseActivity() {
  */
 export async function getTokenInfo(contractAddress: `0x${string}`) {
   try {
+    console.log(`[getTokenInfo] Fetching data for ${contractAddress}`);
     const fetchStringOrBytes32 = async (functionName: 'name' | 'symbol') => {
       try {
-        return await publicClient.readContract({ address: contractAddress, abi: [{ name: functionName, type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] }] as const, functionName });
+        const result = await publicClient.readContract({ address: contractAddress, abi: [{ name: functionName, type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] }] as const, functionName });
+        console.log(`[getTokenInfo] ${functionName} (string): ${result}`);
+        return result;
       } catch {
         try {
           const bytes32 = await publicClient.readContract({ address: contractAddress, abi: [{ name: functionName, type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'bytes32' }] }] as const, functionName });
-          // Convert bytes32 to string
-          return bytes32.toString().replace(/\0/g, ''); // Simple conversion
+          const result = bytes32.toString().replace(/\0/g, '');
+          console.log(`[getTokenInfo] ${functionName} (bytes32): ${result}`);
+          return result;
         } catch {
+          console.log(`[getTokenInfo] ${functionName} failed`);
           return 'N/A';
         }
       }
@@ -80,6 +85,8 @@ export async function getTokenInfo(contractAddress: `0x${string}`) {
       publicClient.readContract({ address: contractAddress, abi: [{ name: 'decimals', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] }] as const, functionName: 'decimals' }).catch(() => 18),
       publicClient.readContract({ address: contractAddress, abi: [{ name: 'totalSupply', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }] as const, functionName: 'totalSupply' }).catch(() => BigInt(0)),
     ]);
+    
+    console.log(`[getTokenInfo] Results: name=${name}, symbol=${symbol}, decimals=${decimals}, totalSupply=${totalSupply}`);
 
 
     // Only consider success if we got at least a name or symbol

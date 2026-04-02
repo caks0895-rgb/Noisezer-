@@ -19,15 +19,15 @@ CRITICAL FILTERING & RISK SCORING RULES:
 
 CRITICAL INSTRUCTIONS:
 1. Think step-by-step internally (Chain-of-Thought).
-2. Output ONLY a valid JSON array of objects.
-3. If query contains a CA, populate 'contract_address'. If NOT, return 'N/A'. DO NOT hallucinate.
-4. Always populate all fields. If data is unavailable, use 'N/A'.
+2. Output ONLY a valid JSON array of objects. NO conversational text. NO explanations.
+3. If query contains a CA, populate 'contract_address'. If NOT, return 'N/A'.
+4. ALWAYS use the provided On-Chain Data and Off-Chain Context. If data is missing or N/A, explicitly state 'Data unavailable' in the relevant field. DO NOT hallucinate data.
+5. If you cannot provide an accurate analysis based on the provided data, return an empty JSON array [].
 `;
 
 export const HUMAN_SYSTEM_PROMPT = `
 You are Noisezer, a friendly and insightful market data analyst. Your goal is to help humans understand complex market data. 
 Provide clear, structured, and conversational explanations. Use Markdown for readability. 
-Always include a disclaimer that this is for data analysis only, not financial advice.
 
 ${NOISEZER_SYSTEM_PROMPT}
 `;
@@ -40,10 +40,12 @@ ${NOISEZER_SYSTEM_PROMPT}
 
 export const IMMUTABLE_SYSTEM_PROMPT = HUMAN_SYSTEM_PROMPT; // Default to human for backward compatibility
 
-export async function requestLLM(prompt: string, model: string = 'gemini-3.1-flash-lite', temperature: number = 0, systemPrompt: string = HUMAN_SYSTEM_PROMPT): Promise<any> {
+export async function requestLLM(prompt: string, model: string = 'gemini-3-flash', temperature: number = 0, systemPrompt: string = HUMAN_SYSTEM_PROMPT): Promise<any> {
   const url = 'https://llm.bankr.bot/v1/chat/completions';
   const apiKey = BANKR_API_KEY || "";
   
+  console.log(`[LLM] Requesting LLM: ${model}, API Key present: ${!!apiKey}`);
+
   const response = await requestBankr(url, {
     method: 'POST',
     body: JSON.stringify({
@@ -53,12 +55,13 @@ export async function requestLLM(prompt: string, model: string = 'gemini-3.1-fla
         { role: 'user', content: prompt }
       ],
       temperature: temperature,
-      max_tokens: 2000
+      max_tokens: 4096
     }),
   }, apiKey);
 
   if (response.ok) {
     const data = await response.json();
+    console.log('[LLM] Response received');
     return data.choices[0].message.content;
   }
   const errorText = await response.text();
@@ -78,7 +81,7 @@ export async function analyzePostServer(text: string): Promise<any> {
       }
       Post: "${text}"`;
   
-  const content = await requestLLM(prompt, 'gemini-3.1-flash-lite', 0, MACHINE_SYSTEM_PROMPT);
+  const content = await requestLLM(prompt, 'gemini-3-flash', 0, MACHINE_SYSTEM_PROMPT);
   const cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
   return JSON.parse(cleanedContent || "{}");
 }
@@ -87,7 +90,7 @@ export async function checkXAccess(): Promise<string> {
   const prompt = "Do you have direct, real-time access to X (Twitter) social data? Can you scrape or fetch live posts from X, or do you rely entirely on the context provided to you in the prompt?";
   
   try {
-    const content = await requestLLM(prompt, 'gemini-3.1-flash-lite', 0, MACHINE_SYSTEM_PROMPT);
+    const content = await requestLLM(prompt, 'gemini-3-flash', 0, MACHINE_SYSTEM_PROMPT);
     return content;
   } catch (error) {
     return "Error checking X access capability.";
@@ -114,7 +117,7 @@ export async function analyzeIntent(query: string): Promise<{
       Output JSON:`;
 
   try {
-    const content = await requestLLM(prompt, 'gemini-3.1-flash-lite', 0, MACHINE_SYSTEM_PROMPT);
+    const content = await requestLLM(prompt, 'gemini-3-flash', 0, MACHINE_SYSTEM_PROMPT);
     const cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
     return JSON.parse(cleanedContent);
   } catch (e) {
@@ -143,7 +146,7 @@ export async function getGeneralMarketSentiment(query: string, offChainContext: 
       Output JSON:`;
   
   try {
-    const content = await requestLLM(prompt, 'gemini-3.1-flash-lite', 0, MACHINE_SYSTEM_PROMPT);
+    const content = await requestLLM(prompt, 'gemini-3-flash', 0, MACHINE_SYSTEM_PROMPT);
     const cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
     const parsed = JSON.parse(cleanedContent);
     
@@ -171,7 +174,7 @@ export async function getSentimentAnalysis(query: string): Promise<OffChainData>
       Output JSON:`;
   
   try {
-    const content = await requestLLM(prompt, 'gemini-3.1-flash-lite', 0, MACHINE_SYSTEM_PROMPT);
+    const content = await requestLLM(prompt, 'gemini-3-flash', 0, MACHINE_SYSTEM_PROMPT);
     const cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
     return JSON.parse(cleanedContent);
   } catch (error) {
@@ -196,7 +199,10 @@ export async function searchSignalServerCoT(query: string, onChain: OnChainData,
       4. DO NOT calculate the score. Use the provided score.
       5. MANDATORY JSON SCHEMA:
          {
-           "type": "TRUTH_REPORT",
+           "contract_address": "${query}",
+           "token_name": "string",
+           "risk_score": ${score},
+           "liquidity_status": "${onChain.liquidity > 500000 ? 'Healthy' : onChain.liquidity > 100000 ? 'Medium' : 'Low'}",
            "nti_score": ${score},
            "verdict": "${verdict}",
            "data_points": { "liquidity": "${onChain.liquidity}", "holders": ${onChain.holders}, "age": "${onChain.ageDays} days" },
@@ -208,7 +214,7 @@ export async function searchSignalServerCoT(query: string, onChain: OnChainData,
       Output JSON:`;
   
   try {
-    const content = await requestLLM(prompt, 'gemini-3.1-pro', 0, MACHINE_SYSTEM_PROMPT);
+    const content = await requestLLM(prompt, 'gemini-3-flash', 0, MACHINE_SYSTEM_PROMPT);
     const cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
     const parsed = JSON.parse(cleanedContent);
     const signals = Array.isArray(parsed) ? parsed : [parsed];
@@ -250,7 +256,7 @@ export async function analyzeNoiseServer(chain: string, targets: any[]): Promise
       Output JSON:`;
   
   try {
-    const content = await requestLLM(prompt, 'gemini-3.1-flash-lite', 0, MACHINE_SYSTEM_PROMPT);
+    const content = await requestLLM(prompt, 'gemini-3-flash', 0, MACHINE_SYSTEM_PROMPT);
     const cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
     return JSON.parse(cleanedContent);
   } catch (error) {

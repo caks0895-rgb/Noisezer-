@@ -1,36 +1,57 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI } from '@google/genai';
 import { getAgentMemory, saveAgentMemory } from '../lib/memory';
-import { HUMAN_SYSTEM_PROMPT } from '../lib/gemini-server';
 import { getTokenInfo } from '../lib/blockchain';
 import ReactMarkdown from 'react-markdown';
-
-// Initialize Gemini
-const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || '' });
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 export default function NoisezerChat({ chatId }: { chatId: string }) {
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [uid, setUid] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    console.log('Gemini API Key:', process.env.NEXT_PUBLIC_GEMINI_API_KEY ? 'Set' : 'Not Set');
-    async function loadMemory() {
-      const memory = await getAgentMemory(chatId);
-      setMessages(memory.history);
+    const hasShownDisclaimer = localStorage.getItem('noisezer_disclaimer_shown');
+    if (!hasShownDisclaimer) {
+      setMessages([{ role: 'assistant', content: 'Disclaimer: Noisezer provides market data and anomaly detection. No investment advice. Always conduct your own due diligence.' }]);
+      localStorage.setItem('noisezer_disclaimer_shown', 'true');
     }
-    loadMemory();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUid(user.uid);
+        loadMemory(user.uid);
+      } else {
+        setUid(null);
+        // Only clear if it's not just the disclaimer
+        setMessages(prev => prev.filter(m => m.content.startsWith('Disclaimer:')));
+      }
+    });
+
+    return () => unsubscribe();
   }, [chatId]);
+
+  async function loadMemory(currentUid: string) {
+    try {
+      const memory = await getAgentMemory(chatId, currentUid);
+      setMessages(memory.history);
+    } catch (error) {
+      console.error("Failed to load memory:", error);
+    }
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim()) return; // Removed !uid check
 
     const userMessage = { role: 'user' as const, content: input };
     setMessages(prev => [...prev, userMessage]);
@@ -38,8 +59,10 @@ export default function NoisezerChat({ chatId }: { chatId: string }) {
     setIsLoading(true);
 
     try {
-      // Save user message
-      await saveAgentMemory(chatId, 'user', userMessage.content);
+      // Save memory only if uid is available
+      if (uid) {
+        await saveAgentMemory(chatId, uid, 'user', userMessage.content);
+      }
 
       // 1. Extract CA if present in query
       const caMatch = input.match(/0x[a-fA-F0-9]{40}/);
@@ -65,21 +88,28 @@ export default function NoisezerChat({ chatId }: { chatId: string }) {
         ${onChainContext}
       `;
 
-      // Call Gemini directly
-      console.log('Sending prompt to Gemini...');
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite-preview',
-        contents: prompt,
-        config: {
-          systemInstruction: HUMAN_SYSTEM_PROMPT,
-        }
+      // Call API route
+      console.log('Sending prompt to API route...');
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, historyContext, uid }),
       });
-      console.log('Gemini response received:', response);
 
-      const assistantMessage = { role: 'assistant' as const, content: response.text || 'No response' };
+      if (!response.ok) {
+        throw new Error('Failed to get response');
+      }
+
+      const data = await response.json();
+      const responseText = data.response;
+      console.log('API route response received:', responseText);
+
+      const assistantMessage = { role: 'assistant' as const, content: responseText || 'No response' };
       
-      // Save assistant message
-      await saveAgentMemory(chatId, 'assistant', assistantMessage.content);
+      // Save assistant message only if uid is available
+      if (uid) {
+        await saveAgentMemory(chatId, uid, 'assistant', assistantMessage.content);
+      }
       setMessages(prev => [...prev, assistantMessage]);
 
     } catch (error) {

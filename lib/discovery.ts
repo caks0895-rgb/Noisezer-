@@ -129,7 +129,7 @@ async function analyzeGitHubRepo(repo: any): Promise<{ score: number, reason: st
   `;
   
   try {
-    const analysis = await requestLLM(prompt, 'gemini-3.1-flash-lite', 0, MACHINE_SYSTEM_PROMPT);
+    const analysis = await requestLLM(prompt, 'gemini-3-flash', 0, MACHINE_SYSTEM_PROMPT);
     const cleanedContent = analysis.replace(/```json\n?|\n?```/g, '').trim();
     return JSON.parse(cleanedContent);
   } catch {
@@ -144,18 +144,20 @@ export async function discoverNewBaseBuilders() {
   for (const repo of repos) {
     const analysis = await analyzeGitHubRepo(repo);
     
-    if (analysis.score > 85) {
+    if (analysis.score > 60) {
+      const status = analysis.score > 80 ? 'VERIFIED' : 'NOT_VERIFIED';
       alphaBuilders.push({ 
         id: `gh-${repo.id}`,
         type: 'GITHUB_ALPHA',
         source: 'GitHub Scout',
         author: repo.owner.login,
-        content: `New Base Builder: ${repo.full_name}. ${analysis.reason}`,
+        content: `[${status}] ${repo.full_name}: ${analysis.reason}`,
         confidence: analysis.score / 100,
         timestamp: Date.now(),
         url: repo.html_url,
         x402Status: 'FREE',
-        isLive: true
+        isLive: true,
+        status: status
       });
     }
   }
